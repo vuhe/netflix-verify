@@ -1,30 +1,33 @@
 use std::fmt::{Display, Formatter};
 
 pub struct RegionCode {
-    name: String,
-    code: String,
+    name: &'static str,
+    code: &'static str,
 }
 
-impl From<String> for RegionCode {
-    fn from(code: String) -> Self {
+static UNKNOWN_NAME: &str = "未知";
+static UNKNOWN_CODE: &str = "Unknown";
+
+impl RegionCode {
+    pub fn unknown() -> Self {
+        RegionCode { name: UNKNOWN_NAME, code: UNKNOWN_CODE }
+    }
+}
+
+impl From<&str> for RegionCode {
+    fn from(code: &str) -> Self {
         for (short_code, name) in REGIONS {
             if code.contains(short_code) {
-                return RegionCode {
-                    name: String::from(name),
-                    code: String::from(short_code),
-                };
+                return RegionCode { name, code: short_code };
             }
         }
-        return RegionCode { name: String::from("Unknown"), code };
+        return RegionCode { name: UNKNOWN_NAME, code: UNKNOWN_CODE };
     }
 }
 
 impl Default for RegionCode {
     fn default() -> Self {
-        RegionCode {
-            name: String::from("美国"),
-            code: String::from("us"),
-        }
+        RegionCode { name: "美国", code: "us" }
     }
 }
 
@@ -34,7 +37,7 @@ impl Display for RegionCode {
     }
 }
 
-static REGIONS: [(&str, &str); 244] = [
+static REGIONS: [(&'static str, &'static str); 244] = [
     ("us", "美国"),
     ("af", "阿富汗"),
     ("ax", "奥兰群岛"),

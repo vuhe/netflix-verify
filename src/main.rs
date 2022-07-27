@@ -2,12 +2,7 @@ mod client;
 mod dns;
 mod args;
 
-use {
-    colored::Colorize,
-    dns::DnsStatus::NotAvailable,
-    client::default_verify,
-    client::custom_verify,
-};
+use colored::Colorize;
 
 #[tokio::main]
 async fn main() {
@@ -21,15 +16,13 @@ async fn main() {
 
     let dns_status = dns::check();
     println!("{}", dns_status);
-    if dns_status == NotAvailable {
+    if dns_status.is_not_available() {
         return;
     }
 
     // ---------------------------- content ----------------------------
 
-    let res = match args.get("custom") {
-        None => default_verify().await,
-        Some(id) => custom_verify(id).await
-    };
-    println!("{}", res.unwrap());
+    let res = client::create()
+        .verify(args.get("custom")).await;
+    println!("{}", res);
 }

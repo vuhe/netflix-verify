@@ -30,6 +30,13 @@ impl DnsStatus {
         }
         status
     }
+
+    pub fn is_not_available(&self) -> bool {
+        match self {
+            NotAvailable => true,
+            _ => false
+        }
+    }
 }
 
 impl PartialEq for DnsStatus {

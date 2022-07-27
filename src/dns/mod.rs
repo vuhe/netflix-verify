@@ -1,7 +1,5 @@
 mod dns_lookup_host;
 
-pub use dns_lookup_host::DnsStatus;
-
-pub fn check() -> DnsStatus {
-    DnsStatus::parse()
+pub fn check() -> dns_lookup_host::DnsStatus {
+    dns_lookup_host::DnsStatus::parse()
 }

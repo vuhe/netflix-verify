@@ -1,7 +1,5 @@
 mod app_args;
 
-use app_args::AppArgs;
-
-pub fn parse() -> AppArgs {
-    AppArgs::parse()
+pub fn parse() -> app_args::AppArgs {
+    app_args::AppArgs::parse()
 }
