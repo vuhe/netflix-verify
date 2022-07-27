@@ -1,6 +1,7 @@
 use {
     std::fmt::{Display, Formatter},
     colored::Colorize,
+    reqwest::{StatusCode, Result, header::HeaderMap, blocking::Response},
     super::request_region::RegionCode,
     NetflixStatus::{NetworkError, NotAvailable, Available},
     AvailableLevel::{Proxy, Custom, SelfMade, All},
@@ -8,7 +9,6 @@ use {
 
 pub enum NetflixStatus {
     NetworkError(String),
-    // IpBanned,
     NotAvailable,
     Available(RegionCode, AvailableLevel),
 }
@@ -18,6 +18,44 @@ pub enum AvailableLevel {
     Custom,
     SelfMade,
     All,
+}
+
+pub(super) trait ToNetflixStatus {
+    fn to_netflix_status(&self) -> NetflixStatus;
+}
+
+impl ToNetflixStatus for Result<Response> {
+    fn to_netflix_status(&self) -> NetflixStatus {
+        match self {
+            Ok(res) => match res.status() {
+                StatusCode::OK => res.headers().to_netflix_status(),
+                _ => NotAvailable
+            }
+            Err(e) => NetworkError(e.to_string())
+        }
+    }
+}
+
+impl ToNetflixStatus for HeaderMap {
+    fn to_netflix_status(&self) -> NetflixStatus {
+        // 客户端发送请求时会自动响应 301 码，自动重定向至相应的地区
+        // 之前 301 响应中的 Location 字段不再适用
+        // 因此取 X-Originating-Url 字段检查
+        if let Some(region) = self.get("X-Originating-Url") {
+            let str = String::from_utf8_lossy(region.as_bytes());
+
+            // 例如：[http:][][www.netflix.com][hk]
+            // 跳过前三个，取地区信息
+            let region_str = str.split("/").skip(3).next();
+
+            let region = match region_str {
+                Some(code) => RegionCode::from(code),
+                None => RegionCode::unknown()
+            };
+            return Available(region, Proxy);
+        }
+        NotAvailable
+    }
 }
 
 impl Display for NetflixStatus {

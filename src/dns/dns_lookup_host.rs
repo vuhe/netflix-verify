@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use {
+    std::fmt::{Display, Formatter},
     std::net::IpAddr::{V4, V6},
     colored::Colorize,
     dns_lookup::lookup_host,

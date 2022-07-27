@@ -8,18 +8,16 @@ pub struct AppArgs {
 
 impl AppArgs {
     pub(super) fn parse() -> Self {
-        const HINT: &str = "A script used to determine whether your network \
-        can watch native Netflix movies or not.";
+        const HINT: &str = "A script used to test Netflix unlock level.";
 
         let matches = App::new("netflix-verify")
             .version("1.0.0")
             .author("vuhe <zhuhe202@qq.com>")
             .about(HINT)
             .args(vec![
-                arg!(-c --custom <ID> "").required(false).default_value(""),
-                // todo!("address and proxy args is not support now.")
+                arg!(-c --custom <ID> "Custom Netflix id for test.").required(false),
+                arg!(-p --proxy <ADDRESS> "Setting proxy address to use.").required(false),
                 // arg!(-a --address <IP> "").required(false).default_value(""),
-                // arg!(-p --proxy <ADDRESS> "").required(false).default_value(""),
             ])
             .get_matches();
 

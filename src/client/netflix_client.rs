@@ -1,55 +1,74 @@
 use {
-    hyper_tls::HttpsConnector,
-    hyper::Client,
-    hyper::client::HttpConnector,
+    reqwest::{blocking::Client, Proxy},
     super::netflix_request::NetflixRequest,
-    super::request_result::NetflixStatus,
-    super::request_result::NetflixStatus::Available,
-    super::request_result::AvailableLevel::{Custom, SelfMade, All},
+    super::request_result::{
+        NetflixStatus, NetflixStatus::Available,
+        AvailableLevel::{Custom, SelfMade, All},
+        ToNetflixStatus,
+    },
 };
 
 pub struct NetflixClient {
-    client: Client<HttpsConnector<HttpConnector>>,
+    client: Client,
 }
 
 impl NetflixClient {
-    pub(super) fn new() -> Self {
-        let connector = HttpsConnector::new();
-        NetflixClient { client: Client::builder().build(connector) }
+    pub(super) fn new(proxy: Option<String>) -> Self {
+        let client = Client::builder();
+        let client = match proxy {
+            None => client,
+            Some(proxy) => {
+                let proxy = Proxy::all(proxy)
+                    .expect("Proxy address error!");
+                client.proxy(proxy)
+            }
+        };
+        NetflixClient { client: client.build().unwrap() }
     }
 
-    pub async fn verify(&self, id: Option<String>) -> NetflixStatus {
+    pub fn verify(&self, id: Option<String>) -> NetflixStatus {
         match id {
-            None => self.default_verify().await,
-            Some(id) => self.custom_verify(id).await
+            None => self.default_verify(),
+            Some(id) => self.custom_verify(id)
         }
     }
 
-    async fn default_verify(&self) -> NetflixStatus {
-        let proxy_check = self.client.netflix_request("80018499".to_string());
-        let self_made_check = self.client.netflix_request("80197526".to_string());
-        let non_self_made_check = self.client.netflix_request("70143836".to_string());
+    fn default_verify(&self) -> NetflixStatus {
+        let proxy_check = self.client.netflix("80018499".to_string());
+        let self_made_check = self.client.netflix("80197526".to_string());
+        let non_self_made_check = self.client.netflix("70143836".to_string());
 
-        let mut result = proxy_check.await.unwrap();
+        let mut result = proxy_check.join().unwrap().to_netflix_status();
+        match result {
+            Available(_, _) => {}
+            _ => { return result; }
+        }
 
-        if let Available(region, _) = self_made_check.await.unwrap() {
+        let self_made = self_made_check.join().unwrap().to_netflix_status();
+        if let Available(region, _) = self_made {
             result = Available(region, SelfMade);
         }
 
-        if let Available(region, _) = non_self_made_check.await.unwrap() {
+        let non_self_made = non_self_made_check.join().unwrap().to_netflix_status();
+        if let Available(region, _) = non_self_made {
             result = Available(region, All);
         }
 
         result
     }
 
-    async fn custom_verify(&self, id: String) -> NetflixStatus {
-        let proxy_check = self.client.netflix_request("80018499".to_string());
-        let custom_check = self.client.netflix_request(id);
+    fn custom_verify(&self, id: String) -> NetflixStatus {
+        let proxy_check = self.client.netflix("80018499".to_string());
+        let custom_check = self.client.netflix(id);
 
-        let mut result = proxy_check.await.unwrap();
+        let mut result = proxy_check.join().unwrap().to_netflix_status();
+        match result {
+            Available(_, _) => {}
+            _ => { return result; }
+        }
 
-        if let Available(region, _) = custom_check.await.unwrap() {
+        let custom = custom_check.join().unwrap().to_netflix_status();
+        if let Available(region, _) = custom {
             result = Available(region, Custom);
         }
 

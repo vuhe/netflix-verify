@@ -4,13 +4,16 @@ mod args;
 
 use colored::Colorize;
 
-#[tokio::main]
-async fn main() {
-
+fn main() {
     // ---------------------------- args ----------------------------
 
     let args = args::parse();
     println!("** Netflix 解锁检测小工具 v0.1.0 By {} **", "@vuhe".cyan());
+
+    let client = match args.get("proxy") {
+        None => client::create(),
+        Some(proxy) => client::with_proxy(proxy)
+    };
 
     // ---------------------------- dns ----------------------------
 
@@ -22,7 +25,6 @@ async fn main() {
 
     // ---------------------------- content ----------------------------
 
-    let res = client::create()
-        .verify(args.get("custom")).await;
+    let res = client.verify(args.get("custom"));
     println!("{}", res);
 }
