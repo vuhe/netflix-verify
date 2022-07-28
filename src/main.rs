@@ -8,7 +8,9 @@ fn main() {
     // ---------------------------- args ----------------------------
 
     let args = args::parse();
-    println!("** Netflix 解锁检测小工具 v0.1.0 By {} **", "@vuhe".cyan());
+
+    println!();
+    println!("** Netflix 解锁检测小工具 v1.0.0 By {} **", "@vuhe".cyan());
 
     let client = match args.get("proxy") {
         None => client::create(),
