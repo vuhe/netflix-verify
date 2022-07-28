@@ -1,25 +1,45 @@
 use {
-    std::time::Duration,
     std::thread::{spawn, JoinHandle},
     reqwest::blocking::{Client, Response},
     reqwest::Result,
+    super::network_status::{NetworkStatus, ToNetworkStatus},
 };
 
 pub(super) trait NetflixRequest {
-    fn netflix(&self, id: String) -> JoinHandle<Result<Response>>;
+    fn netflix(&self) -> (NetworkStatus, NetworkStatus, NetworkStatus);
+    fn netflix_id(&self, id: String) -> (NetworkStatus, NetworkStatus);
 }
 
 impl NetflixRequest for Client {
-    fn netflix(&self, id: String) -> JoinHandle<Result<Response>> {
-        const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 \
-        (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36";
-        let client = self.clone();
-        let uri = format!("https://www.netflix.com/title/{}", id);
-        spawn(move || {
-            client.get(uri)
-                .header("USER-AGENT", USER_AGENT)
-                .timeout(Duration::from_secs(5))
-                .send()
-        })
+    fn netflix(&self) -> (NetworkStatus, NetworkStatus, NetworkStatus) {
+        let proxy = netflix_str(self, "80018499");
+        let self_made = netflix_str(self, "80197526");
+        let all = netflix_str(self, "70143836");
+
+        let proxy = proxy.join().unwrap().to_network_status();
+        let self_made = self_made.join().unwrap().to_network_status();
+        let all = all.join().unwrap().to_network_status();
+
+        (proxy, self_made, all)
     }
+
+    fn netflix_id(&self, id: String) -> (NetworkStatus, NetworkStatus) {
+        let proxy = netflix_str(self, "80018499");
+        let custom = netflix(self, id);
+
+        let proxy = proxy.join().unwrap().to_network_status();
+        let custom = custom.join().unwrap().to_network_status();
+
+        (proxy, custom)
+    }
+}
+
+fn netflix_str(client: &Client, id: &str) -> JoinHandle<Result<Response>> {
+    netflix(client, id.to_string())
+}
+
+fn netflix(client: &Client, id: String) -> JoinHandle<Result<Response>> {
+    let client = client.clone();
+    let uri = format!("https://www.netflix.com/title/{}", id);
+    spawn(move || { client.get(uri).send() })
 }

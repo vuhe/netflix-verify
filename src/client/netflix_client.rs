@@ -1,12 +1,13 @@
 use {
-    reqwest::{blocking::Client, Proxy},
+    std::time::Duration,
+    reqwest::{blocking::Client, redirect::Policy, Proxy as HttpProxy},
     super::netflix_request::NetflixRequest,
-    super::request_result::{
-        NetflixStatus, NetflixStatus::Available,
-        AvailableLevel::{Custom, SelfMade, All},
-        ToNetflixStatus,
-    },
+    super::verify_result::VerifyResult,
+    super::unlock_status::UnlockStatus::{Proxy, Custom, SelfMade, All},
 };
+
+static USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 \
+(KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36";
 
 pub struct NetflixClient {
     client: Client,
@@ -14,11 +15,17 @@ pub struct NetflixClient {
 
 impl NetflixClient {
     pub(super) fn new(proxy: Option<String>) -> Self {
-        let client = Client::builder();
+        // 默认 USER_AGENT; 限制重定向; 默认5秒超时
+        let client = Client::builder()
+            .user_agent(USER_AGENT)
+            .redirect(Policy::custom(|a| a.stop()))
+            .timeout(Duration::from_secs(5));
+
+        // 代理设置
         let client = match proxy {
             None => client,
             Some(proxy) => {
-                let proxy = Proxy::all(proxy)
+                let proxy = HttpProxy::all(proxy)
                     .expect("Proxy address error!");
                 client.proxy(proxy)
             }
@@ -26,52 +33,30 @@ impl NetflixClient {
         NetflixClient { client: client.build().unwrap() }
     }
 
-    pub fn verify(&self, id: Option<String>) -> NetflixStatus {
+    pub fn verify(&self, id: Option<String>) -> VerifyResult {
         match id {
-            None => self.default_verify(),
-            Some(id) => self.custom_verify(id)
+            None => {
+                let (proxy, self_made, all) = self.client.netflix();
+                if all.is_available() {
+                    VerifyResult::with(all, All)
+                } else if self_made.is_available() {
+                    VerifyResult::with(self_made, SelfMade)
+                } else if proxy.is_available() {
+                    VerifyResult::with(proxy, Proxy)
+                } else {
+                    VerifyResult::new(proxy)
+                }
+            }
+            Some(id) => {
+                let (proxy, custom) = self.client.netflix_id(id);
+                if custom.is_available() {
+                    VerifyResult::with(custom, Custom)
+                } else if proxy.is_available() {
+                    VerifyResult::with(proxy, Proxy)
+                } else {
+                    VerifyResult::new(proxy)
+                }
+            }
         }
-    }
-
-    fn default_verify(&self) -> NetflixStatus {
-        let proxy_check = self.client.netflix("80018499".to_string());
-        let self_made_check = self.client.netflix("80197526".to_string());
-        let non_self_made_check = self.client.netflix("70143836".to_string());
-
-        let mut result = proxy_check.join().unwrap().to_netflix_status();
-        match result {
-            Available(_, _) => {}
-            _ => { return result; }
-        }
-
-        let self_made = self_made_check.join().unwrap().to_netflix_status();
-        if let Available(region, _) = self_made {
-            result = Available(region, SelfMade);
-        }
-
-        let non_self_made = non_self_made_check.join().unwrap().to_netflix_status();
-        if let Available(region, _) = non_self_made {
-            result = Available(region, All);
-        }
-
-        result
-    }
-
-    fn custom_verify(&self, id: String) -> NetflixStatus {
-        let proxy_check = self.client.netflix("80018499".to_string());
-        let custom_check = self.client.netflix(id);
-
-        let mut result = proxy_check.join().unwrap().to_netflix_status();
-        match result {
-            Available(_, _) => {}
-            _ => { return result; }
-        }
-
-        let custom = custom_check.join().unwrap().to_netflix_status();
-        if let Available(region, _) = custom {
-            result = Available(region, Custom);
-        }
-
-        result
     }
 }
